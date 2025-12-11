@@ -30,8 +30,6 @@ import sys
 import time
 from typing import Any, Dict, List, Optional, Union
 
-import gin
-
 # pyre-ignore [21]
 import mlperf_loadgen as lg  # @manual
 import numpy as np
@@ -64,10 +62,6 @@ NANO_SEC = 1e9
 
 USER_CONF = f"{os.path.dirname(__file__)}/user.conf"
 
-SUPPORTED_CONFIGS = {
-    "sampled-streaming-100b": "streaming_100b.gin",
-}
-
 
 SCENARIO_MAP = {  # pyre-ignore [5]
     "SingleStream": lg.TestScenario.SingleStream,
@@ -81,7 +75,49 @@ def get_args():  # pyre-ignore [3]
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--dataset", default="debug", choices=SUPPORTED_DATASETS, help="dataset"
+        "--dataset", default="sampled-streaming-100b", choices=SUPPORTED_DATASETS, help="name of the dataset"
+    )
+    parser.add_argument(
+        "--model-path", default="", help="path to the model checkpoint. Example: /home/username/ckpts/streaming_100b/89/"
+    )
+    parser.add_argument(
+        "--scenario-name", default="Server", choices={"SingleStream", "MultiStream", "Server", "Offline"}, help="inference benchmark scenario"
+    )
+    parser.add_argument(
+        "--batchsize", default=20, help="batch size used in the benchmark"
+    )
+    parser.add_argument(
+        "--output-trace", default=False, help="Whether to output trace"
+    )
+    parser.add_argument(
+        "--data-producer-threads", default=16, help="Number of threads used in data producer"
+    )
+    parser.add_argument(
+        "--compute-eval", default=False, help="If true, will run AccuracyOnly mode and outputs both predictions and labels for accuracy calcuations"
+    )
+    parser.add_argument(
+        "--find-peak-performance", default=False, help="Whether to find peak performance in the benchmark"
+    )
+    parser.add_argument(
+        "--dataset-path-prefix", default="", help="Prefix to the dataset path. Example: /home/username/"
+    )
+    parser.add_argument(
+        "--warmup-ratio", default=0.1, help="The ratio of the dataset used to warmup SUT"
+    )
+    parser.add_argument(
+        "--num-queries", default=500000, help="Number of queries to run in the benchmark"
+    )
+    parser.add_argument(
+        "--target-qps", default=1500, help="Benchmark target QPS. Needs to be tuned for different implementations to balance latency and throughput"
+    )
+    parser.add_argument(
+        "--numpy-rand-seed", default=123, help="Numpy random seed"
+    )
+    parser.add_argument(
+        "--sparse-quant", default=False, help="Whether to quantize sparse arch"
+    )
+    parser.add_argument(
+        "--dataset-percentage", default=0.001, help="Percentage of the dataset to run in the benchmark"
     )
     args, unknown_args = parser.parse_known_args()
     logger.warning(f"unknown_args: {unknown_args}")
@@ -363,33 +399,24 @@ class StreamingQuerySampler:
         return self.total_requests
 
 
-@gin.configurable
 def run(
     dataset: str = "debug",
     model_path: str = "",
     scenario_name: str = "Server",
     batchsize: int = 16,
-    out_dir: str = "",
     output_trace: bool = False,
     data_producer_threads: int = 4,
     compute_eval: bool = False,
     find_peak_performance: bool = False,
-    new_path_prefix: str = "",
-    train_split_percentage: float = 0.75,
+    dataset_path_prefix: str = "",
     warmup_ratio: float = 0.1,
-    # below will override mlperf rules compliant settings - don't use for official submission
-    duration: Optional[int] = None,
     target_qps: Optional[int] = None,
-    max_latency: Optional[float] = None,
     num_queries: Optional[int] = None,
-    samples_per_query_multistream: int = 8,
-    max_num_samples: int = -1,
     numpy_rand_seed: int = 123,
-    dev_mode: bool = False,
     sparse_quant: bool = False,
     dataset_percentage: float = 1.0,
 ) -> None:
-    set_dev_mode(dev_mode)
+    set_dev_mode(False)
     if scenario_name not in SCENARIO_MAP:
         raise NotImplementedError("valid scanarios:" + str(list(SCENARIO_MAP.keys())))
     scenario = SCENARIO_MAP[scenario_name]
@@ -408,7 +435,7 @@ def run(
         compute_eval=compute_eval,
     )
     is_streaming: bool = "streaming" in dataset
-    dataset, kwargs = get_dataset(dataset, new_path_prefix)
+    dataset, kwargs = get_dataset(dataset, dataset_path_prefix)
 
     ds: Dataset = dataset(
         hstu_config=hstu_config,
@@ -430,11 +457,6 @@ def run(
         logger.error("{} not found".format(user_conf))
         sys.exit(1)
 
-    if out_dir:
-        output_dir = os.path.abspath(out_dir)
-        os.makedirs(output_dir, exist_ok=True)
-        os.chdir(output_dir)
-
     # warmup
     warmup_ids = list(range(batchsize))
     ds.load_query_samples(warmup_ids)
@@ -453,7 +475,7 @@ def run(
         if not is_streaming
         else ds.get_item_count()
     )
-    train_size: int = round(train_split_percentage * count) if not is_streaming else 0
+    train_size: int = 0
 
     settings = lg.TestSettings()
     settings.FromConfig(user_conf, model_path, scenario_name)
@@ -489,20 +511,9 @@ def run(
     if find_peak_performance:
         settings.mode = lg.TestMode.FindPeakPerformance
 
-    if duration:
-        settings.min_duration_ms = duration
-        settings.max_duration_ms = duration
-
     if target_qps:
         settings.server_target_qps = float(target_qps)
         settings.offline_expected_qps = float(target_qps)
-
-    if samples_per_query_multistream:
-        settings.multi_stream_samples_per_query = samples_per_query_multistream
-
-    if max_latency:
-        settings.server_target_latency_ns = int(max_latency * NANO_SEC)
-        settings.multi_stream_expected_latency_ns = int(max_latency * NANO_SEC)
 
     # inference benchmark warmup
     if is_streaming:
@@ -549,7 +560,7 @@ def run(
     sut = lg.ConstructSUT(issue_queries, flush_queries)
     qsl = lg.ConstructQSL(
         count,
-        min(count, max_num_samples) if max_num_samples > 0 else count,
+        count,
         load_query_samples,
         ds.unload_query_samples,
     )
@@ -572,18 +583,28 @@ def run(
     if int(os.environ.get("WORLD_SIZE", 1)) > 1:
         model_family.predict(None)
 
-    if out_dir:
-        with open("results.json", "w") as f:
-            json.dump(final_results, f, sort_keys=True, indent=4)
-
 
 def main() -> None:
     set_verbose_level(1)
     args = get_args()
     logger.info(args)
-    gin_path = f"{os.path.dirname(__file__)}/gin/{SUPPORTED_CONFIGS[args.dataset]}"
-    gin.parse_config_file(gin_path)
-    run(dataset=args.dataset)
+    run(
+        dataset=args.dataset,
+        model_path=args.model_path,
+        scenario_name=args.scenario_name,
+        batchsize=args.batchsize,
+        output_trace=args.output_trace,
+        data_producer_threads=args.data_producer_threads,
+        compute_eval=args.compute_eval,
+        find_peak_performance=args.find_peak_performance,
+        dataset_path_prefix=args.dataset_path_prefix,
+        warmup_ratio=args.warmup_ratio,
+        target_qps=args.target_qps,
+        num_queries=args.num_queries,
+        numpy_rand_seed=args.numpy_rand_seed,
+        sparse_quant=args.sparse_quant,
+        dataset_percentage=args.dataset_percentage,
+    )
 
 
 if __name__ == "__main__":

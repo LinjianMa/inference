@@ -274,14 +274,6 @@ class MetricsLogger:
 
 # the datasets we support
 SUPPORTED_DATASETS = [
-    "debug",
-    "movielens-1m",
-    "movielens-20m",
-    "movielens-13b",
-    "movielens-18b",
-    "kuairand-1k",
-    "streaming-400m",
-    "streaming-200b",
     "streaming-100b",
     "sampled-streaming-100b",
 ]
@@ -290,38 +282,6 @@ SUPPORTED_DATASETS = [
 @gin.configurable
 def get_dataset(name: str, new_path_prefix: str = ""):
     assert name in SUPPORTED_DATASETS, f"dataset {name} not supported"
-    if name == "debug":
-        return DLRMv3RandomDataset, {}
-    if name == "streaming-400m":
-        return (
-            DLRMv3SyntheticStreamingDataset,
-            {
-                "ratings_file_prefix": os.path.join(
-                    new_path_prefix, "data/streaming-400m/"
-                ),
-                "train_ts": 8,
-                "total_ts": 10,
-                "num_files": 3,
-                "num_users": 150_000,
-                "num_items": 1_500_000,
-                "num_categories": 128,
-            },
-        )
-    if name == "streaming-200b":
-        return (
-            DLRMv3SyntheticStreamingDataset,
-            {
-                "ratings_file_prefix": os.path.join(
-                    new_path_prefix, "data/streaming-200b/"
-                ),
-                "train_ts": 90,
-                "total_ts": 100,
-                "num_files": 100,
-                "num_users": 10_000_000,
-                "num_items": 1_000_000_000,
-                "num_categories": 128,
-            },
-        )
     if name == "streaming-100b":
         return (
             DLRMv3SyntheticStreamingDataset,
