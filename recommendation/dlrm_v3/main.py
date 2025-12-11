@@ -37,22 +37,19 @@ import mlperf_loadgen as lg  # @manual
 import numpy as np
 import torch
 from generative_recommenders.common import set_dev_mode, set_verbose_level
-from generative_recommenders.dlrm_v3.configs import (
-    get_embedding_table_config,
-    get_hstu_configs,
-)
-from generative_recommenders.dlrm_v3.datasets.dataset import Dataset, Samples
-from generative_recommenders.dlrm_v3.datasets.synthetic_streaming import (
+from configs import get_embedding_table_config, get_hstu_configs
+from datasets.dataset import Dataset, Samples
+from datasets.synthetic_streaming import (
     DLRMv3SyntheticStreamingDataset,
 )
-from generative_recommenders.dlrm_v3.inference.data_producer import (
+from data_producer import (
     MultiThreadDataProducer,
     QueryItem,
     SingleThreadDataProducer,
 )
-from generative_recommenders.dlrm_v3.inference.inference_modules import set_is_inference
-from generative_recommenders.dlrm_v3.inference.model_family import HSTUModelFamily
-from generative_recommenders.dlrm_v3.utils import (
+from inference_modules import set_is_inference
+from model_family import HSTUModelFamily
+from utils import (
     get_dataset,
     profiler_or_nullcontext,
     SUPPORTED_DATASETS,
@@ -68,10 +65,6 @@ NANO_SEC = 1e9
 USER_CONF = f"{os.path.dirname(__file__)}/user.conf"
 
 SUPPORTED_CONFIGS = {
-    "debug": "debug.gin",
-    "kuairand-1k": "kuairand_1k.gin",
-    "movielens-13b": "movielens_13b.gin",
-    "streaming-400m": "streaming_400m.gin",
     "sampled-streaming-100b": "streaming_100b.gin",
 }
 

@@ -21,12 +21,12 @@ from typing import Any, Dict, List, Set, Tuple
 
 import pandas as pd
 import torch
-from generative_recommenders.dlrm_v3.datasets.dataset import (
+from datasets.dataset import (
     collate_fn,
     DLRMv3RandomDataset,
     Samples,
 )
-from generative_recommenders.dlrm_v3.datasets.utils import (
+from datasets.utils import (
     json_loads,
     maybe_truncate_seq,
 )

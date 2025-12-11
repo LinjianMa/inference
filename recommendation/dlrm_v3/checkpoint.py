@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional, Set
 import gin
 
 import torch
-from generative_recommenders.dlrm_v3.utils import MetricsLogger
+from utils import MetricsLogger
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.optim.optimizer import Optimizer
 from torchrec.distributed.types import ShardedTensor

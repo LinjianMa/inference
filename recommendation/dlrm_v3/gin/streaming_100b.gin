@@ -1,4 +1,4 @@
-run.model_path = "/home/linjianma/ckpts/streaming_100b/89/"
+# run.model_path = "/home/linjianma/ckpts/streaming_100b/89/"
 run.scenario_name = "Server"
 run.batchsize = 20
 run.out_dir = ""

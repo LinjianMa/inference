@@ -21,7 +21,7 @@ from queue import Queue
 from typing import List, Optional, Tuple
 
 import torch
-from generative_recommenders.dlrm_v3.datasets.dataset import Dataset, Samples
+from datasets.dataset import Dataset, Samples
 
 logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger("data_producer")

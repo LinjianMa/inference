@@ -26,13 +26,8 @@ import gin
 import tensorboard  # @manual=//tensorboard:lib  # noqa: F401 - required implicit dep when using torch.utils.tensorboard
 
 import torch
-from generative_recommenders.dlrm_v3.datasets.dataset import DLRMv3RandomDataset
-from generative_recommenders.dlrm_v3.datasets.kuairand import DLRMv3KuaiRandDataset
-from generative_recommenders.dlrm_v3.datasets.movie_lens import DLRMv3MovieLensDataset
-from generative_recommenders.dlrm_v3.datasets.synthetic_movie_lens import (
-    DLRMv3SyntheticMovieLensDataset,
-)
-from generative_recommenders.dlrm_v3.datasets.synthetic_streaming import (
+from datasets.dataset import DLRMv3RandomDataset
+from datasets.synthetic_streaming import (
     DLRMv3SyntheticStreamingDataset,
 )
 from generative_recommenders.modules.multitask_module import (
@@ -297,51 +292,6 @@ def get_dataset(name: str, new_path_prefix: str = ""):
     assert name in SUPPORTED_DATASETS, f"dataset {name} not supported"
     if name == "debug":
         return DLRMv3RandomDataset, {}
-    if name == "movielens-1m":
-        return (
-            DLRMv3MovieLensDataset,
-            {
-                "ratings_file": os.path.join(
-                    new_path_prefix, "data/ml-1m/sasrec_format.csv"
-                ),
-            },
-        )
-    if name == "movielens-20m":
-        return (
-            DLRMv3MovieLensDataset,
-            {
-                "ratings_file": os.path.join(
-                    new_path_prefix, "data/ml-20m/sasrec_format.csv"
-                ),
-            },
-        )
-    if name == "movielens-13b":
-        return (
-            DLRMv3SyntheticMovieLensDataset,
-            {
-                "ratings_file_prefix": os.path.join(
-                    new_path_prefix, "data/ml-13b/16x16384"
-                ),
-            },
-        )
-    if name == "movielens-18b":
-        return (
-            DLRMv3SyntheticMovieLensDataset,
-            {
-                "ratings_file_prefix": os.path.join(
-                    new_path_prefix, "data/ml-18b/20x36864"
-                ),
-            },
-        )
-    if name == "kuairand-1k":
-        return (
-            DLRMv3KuaiRandDataset,
-            {
-                "seq_logs_file": os.path.join(
-                    new_path_prefix, "data/KuaiRand-1K/data/processed_seqs.csv"
-                ),
-            },
-        )
     if name == "streaming-400m":
         return (
             DLRMv3SyntheticStreamingDataset,

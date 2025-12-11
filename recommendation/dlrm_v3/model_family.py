@@ -29,18 +29,18 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.multiprocessing as mp
 import torchrec
-from generative_recommenders.dlrm_v3.checkpoint import (
+from checkpoint import (
     load_nonsparse_checkpoint,
     load_sparse_checkpoint,
 )
-from generative_recommenders.dlrm_v3.datasets.dataset import Samples
-from generative_recommenders.dlrm_v3.inference.inference_modules import (
+from datasets.dataset import Samples
+from inference_modules import (
     get_hstu_model,
     HSTUSparseInferenceModule,
     move_sparse_output_to_device,
     set_is_inference,
 )
-from generative_recommenders.dlrm_v3.utils import Profiler
+from utils import Profiler
 from generative_recommenders.modules.dlrm_hstu import DlrmHSTUConfig, SequenceEmbedding
 from pyre_extensions import none_throws
 from torch import quantization as quant
