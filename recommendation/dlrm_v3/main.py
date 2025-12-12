@@ -19,9 +19,9 @@ mlperf dlrm_v3 inference benchmarking tool.
 
 import argparse
 import array
-import json
 import logging
 import random
+import threading
 
 logging.basicConfig(level=logging.INFO)
 import math
@@ -52,7 +52,6 @@ from utils import (
     profiler_or_nullcontext,
     SUPPORTED_DATASETS,
 )
-
 
 logger: logging.Logger = logging.getLogger("main")
 
@@ -99,16 +98,16 @@ def get_args():  # pyre-ignore [3]
         "--find-peak-performance", default=False, help="Whether to find peak performance in the benchmark"
     )
     parser.add_argument(
-        "--dataset-path-prefix", default="", help="Prefix to the dataset path. Example: /home/username/"
+        "--dataset-path-prefix", default=f"/home/{os.getlogin()}/", help="Prefix to the dataset path. Example: /home/username/"
     )
     parser.add_argument(
-        "--warmup-ratio", default=0.1, help="The ratio of the dataset used to warmup SUT"
+        "--warmup-ratio", default=0.3, help="The ratio of the dataset used to warmup SUT"
     )
     parser.add_argument(
         "--num-queries", default=500000, help="Number of queries to run in the benchmark"
     )
     parser.add_argument(
-        "--target-qps", default=1500, help="Benchmark target QPS. Needs to be tuned for different implementations to balance latency and throughput"
+        "--target-qps", default=1000, help="Benchmark target QPS. Needs to be tuned for different implementations to balance latency and throughput"
     )
     parser.add_argument(
         "--numpy-rand-seed", default=123, help="Numpy random seed"
@@ -332,6 +331,7 @@ class StreamingQuerySampler:
             get_num_queries(input_queries, self.total_requests) // self.total_requests
         )
         self.repeat: int = 0
+        self._lock = threading.Lock()
 
     def get_num_requests(self, warmup_ratio: float) -> List[int]:
         return [
@@ -359,6 +359,7 @@ class StreamingQuerySampler:
         self.ts = self.start_ts
         self.ds.set_ts(self.start_ts)
         self.cnt = 0
+        self.repeat = 0
 
     def load_query_samples(self, query_ids: List[Optional[int]]) -> None:
         length = len(query_ids)
@@ -382,17 +383,19 @@ class StreamingQuerySampler:
     def get_samples(self, id_list: List[int]) -> Samples:
         batch_size: int = len(id_list)
         ts_idx: int = 0
-        while self.num_requests_cumsum[ts_idx] <= self.cnt:
-            ts_idx += 1
-        offset: int = 0 if ts_idx == 0 else self.num_requests_cumsum[ts_idx - 1]
+        with self._lock:
+            current_cnt: int = self.cnt
+            while self.num_requests_cumsum[ts_idx] <= current_cnt:
+                ts_idx += 1
+            offset: int = 0 if ts_idx == 0 else self.num_requests_cumsum[ts_idx - 1]
+            self.repeat += 1
+            if self.repeat == self.num_repeats:
+                self.repeat = 0
+                self.cnt += batch_size
         output: Samples = self.ds.get_samples_with_ts(
-            self.run_order[ts_idx][self.cnt - offset : self.cnt + batch_size - offset],
+            self.run_order[ts_idx][current_cnt - offset : current_cnt + batch_size - offset],
             ts_idx + self.start_ts,
         )
-        self.repeat += 1
-        if self.repeat == self.num_repeats:
-            self.repeat = 0
-            self.cnt += batch_size
         return output
 
     def get_item_count(self) -> int:
@@ -400,7 +403,7 @@ class StreamingQuerySampler:
 
 
 def run(
-    dataset: str = "debug",
+    dataset: str = "sampled-streaming-100b",
     model_path: str = "",
     scenario_name: str = "Server",
     batchsize: int = 16,

@@ -306,10 +306,10 @@ class ModelFamilyDenseDist:
             processes.append(p)
 
     def distributed_setup(self, rank: int, world_size: int, model_path: str) -> None:
-        nprocs_per_rank = 16
-        start_core: int = nprocs_per_rank * rank
-        cores: set[int] = set([start_core + i for i in range(nprocs_per_rank)])
-        os.sched_setaffinity(0, cores)
+        # nprocs_per_rank = 16
+        # start_core: int = nprocs_per_rank * rank + 128
+        # cores: set[int] = set([start_core + i for i in range(nprocs_per_rank)])
+        # os.sched_setaffinity(0, cores)
         set_is_inference(is_inference=not self.compute_eval)
         model = get_hstu_model(
             table_config=self.table_config,
@@ -366,6 +366,9 @@ class ModelFamilyDenseDist:
                         max_num_candidates=max_num_candidates,
                         num_candidates=num_candidates,
                     )
+                    # mt_target_preds = torch.empty(1, 2048 * 20).to(device="cpu")
+                    # mt_target_labels = None
+                    # mt_target_weights = None
                     assert mt_target_preds is not None
                     mt_target_preds = mt_target_preds.detach().to(device="cpu")
                     if mt_target_labels is not None:

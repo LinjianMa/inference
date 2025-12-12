@@ -23,8 +23,8 @@ import logging
 
 import numpy as np
 import torch
-from generative_recommenders.dlrm_v3.configs import get_hstu_configs
-from generative_recommenders.dlrm_v3.utils import MetricsLogger
+from configs import get_hstu_configs
+from utils import MetricsLogger
 
 logger: logging.Logger = logging.getLogger("main")
 
