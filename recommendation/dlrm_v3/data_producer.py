@@ -18,7 +18,7 @@ import logging
 import threading
 import time
 from queue import Queue
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import torch
 from datasets.dataset import Dataset, Samples
@@ -55,16 +55,30 @@ class SingleThreadDataProducer:
     ) -> None:
         with torch.profiler.record_function("data batching"):
             t0_batching: float = time.time()
-            samples = self.ds.get_samples(content_ids)
+            samples: Union[Samples, List[Samples]] = self.ds.get_samples(content_ids)
             dt_batching: float = time.time() - t0_batching
-            query = QueryItem(
-                query_ids=query_ids,
-                samples=samples,
-                start=t0,
-                dt_queue=dt_queue,
-                dt_batching=dt_batching,
-            )
-            self.run_one_item(query)
+            if isinstance(samples, Samples):
+                query = QueryItem(
+                    query_ids=query_ids,
+                    samples=samples,
+                    start=t0,
+                    dt_queue=dt_queue,
+                    dt_batching=dt_batching,
+                )
+                self.run_one_item(query)
+            else:
+                start_idx = 0
+                for sample in samples:
+                    batch_size: int = sample.batch_size()
+                    query = QueryItem(
+                        query_ids=query_ids[start_idx : start_idx + batch_size],
+                        samples=sample,
+                        start=t0,
+                        dt_queue=dt_queue,
+                        dt_batching=dt_batching,
+                    )
+                    start_idx += batch_size
+                    self.run_one_item(query)
 
     def finish(self) -> None:
         pass
@@ -102,17 +116,32 @@ class MultiThreadDataProducer:
                 break
             query_ids, content_ids, t0, dt_queue = query_and_content_ids
             t0_batching: float = time.time()
-            samples = self.ds.get_samples(content_ids)
+            samples: Union[Samples, List[Samples]] = self.ds.get_samples(content_ids)
             dt_batching: float = time.time() - t0_batching
-            qitem = QueryItem(
-                query_ids=query_ids,
-                samples=samples,
-                start=t0,
-                dt_queue=dt_queue,
-                dt_batching=dt_batching,
-            )
-            with torch.inference_mode(), torch.cuda.stream(stream):
-                self.run_one_item(qitem)
+            if isinstance(samples, Samples):
+                qitem = QueryItem(
+                    query_ids=query_ids,
+                    samples=samples,
+                    start=t0,
+                    dt_queue=dt_queue,
+                    dt_batching=dt_batching,
+                )
+                with torch.inference_mode(), torch.cuda.stream(stream):
+                    self.run_one_item(qitem)
+            else:
+                start_idx = 0
+                for sample in samples:
+                    batch_size: int = sample.batch_size()
+                    qitem = QueryItem(
+                        query_ids=query_ids[start_idx : start_idx + batch_size],
+                        samples=sample,
+                        start=t0,
+                        dt_queue=dt_queue,
+                        dt_batching=dt_batching,
+                    )
+                    start_idx += batch_size
+                    with torch.inference_mode(), torch.cuda.stream(stream):
+                        self.run_one_item(qitem)
             tasks_queue.task_done()
 
     def enqueue(

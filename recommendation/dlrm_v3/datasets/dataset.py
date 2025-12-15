@@ -43,6 +43,9 @@ class Samples:
         for attr in vars(self):
             setattr(self, attr, getattr(self, attr).to(device=device))
 
+    def batch_size(self) -> int:
+        return self.uih_features_kjt.stride()
+
 
 def collate_fn(
     samples: List[Tuple[KeyedJaggedTensor, KeyedJaggedTensor]],
