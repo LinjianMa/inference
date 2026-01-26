@@ -46,6 +46,21 @@ def parse_sample(data):
     return ts_idx, query_idx, predictions, labels, weights
 
 
+def parse_sample_perf(data):
+    """
+    Parse a performance sample's data array into its components.
+
+    Format: [ts_idx, query_idx, predictions...]
+
+    Returns:
+        tuple: (ts_idx, query_idx, predictions)
+    """
+    ts_idx = int(data[0])
+    query_idx = int(data[1])
+    predictions = data[2:]
+    return ts_idx, query_idx, predictions
+
+
 def compute_ne(predictions, labels, weights):
     """
     Compute Normalized Entropy (NE) for a single sample.
@@ -110,7 +125,6 @@ def run(acc_log, perf_log, tolerance):
         acc_data = json.load(f)
     with open(perf_log, "r") as f:
         perf_data = json.load(f)
-
     print("Reading accuracy mode results...")
     acc_samples = {}
     for sample in acc_data:
@@ -118,25 +132,30 @@ def run(acc_log, perf_log, tolerance):
         ts_idx, query_idx, predictions, labels, weights = parse_sample(data)
         ne = compute_ne(predictions, labels, weights)
         key = (ts_idx, query_idx)
-        acc_samples[key] = ne
+        acc_samples[key] = {
+            "ne": ne,
+            "labels": labels,
+            "weights": weights,
+        }
 
     print("Reading performance mode results...")
     num_matched = 0
     num_unmatched = 0
     num_ne_mismatch = 0
-
     for sample in perf_data:
         data = hex_to_array(sample["data"])
-        ts_idx, query_idx, predictions, labels, weights = parse_sample(data)
-        perf_ne = compute_ne(predictions, labels, weights)
+        ts_idx, query_idx, predictions = parse_sample_perf(data)
         key = (ts_idx, query_idx)
-
         if key not in acc_samples:
             num_unmatched += 1
             continue
 
-        acc_ne = acc_samples[key]
+        acc_ne = acc_samples[key]["ne"]
         num_matched += 1
+
+        labels = acc_samples[key]["labels"]
+        weights = acc_samples[key]["weights"]
+        perf_ne = compute_ne(predictions, labels, weights)
 
         if acc_ne == 0 and perf_ne == 0:
             continue
